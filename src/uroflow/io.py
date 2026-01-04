@@ -26,3 +26,9 @@ def load_raw_session(session_dir: str | Path):
         raise ValueError("t_ms must be monotonically increasing")
     
     return t_ms, raw
+
+def load_timebase(t_ms: np.ndarray):
+    t_s = t_ms / 1000.0
+    dt_s = np.diff(t_s)
+    fs_hz = 1.0 / np.median(dt_s)
+    return t_s, dt_s, fs_hz
