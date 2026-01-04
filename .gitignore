@@ -1,0 +1,4 @@
+.DS_Store
+sessions/
+__pycache__/
+*.pyc
