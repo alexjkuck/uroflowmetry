@@ -28,7 +28,20 @@ def load_raw_session(session_dir: str | Path):
     return t_ms, raw
 
 def load_timebase(t_ms: np.ndarray):
+    t_ms = np.asarray(t_ms)
+    
+    if len(t_ms) < 2:
+        raise ValueError(f"Need at least 2 time points, got {len(t_ms)}")
+    
     t_s = t_ms / 1000.0
     dt_s = np.diff(t_s)
-    fs_hz = 1.0 / np.median(dt_s)
+    
+    if np.any(dt_s <= 0):
+        raise ValueError("Time must be strictly increasing")
+    
+    median_dt = np.median(dt_s)
+    if median_dt <= 0:
+        raise ValueError("Median time step must be positive")
+    
+    fs_hz = 1.0 / median_dt
     return t_s, dt_s, fs_hz
