@@ -35,7 +35,9 @@ return(summand1+summand2)
 
 SPECIFIC SOFTWARE
 
-I need software that connects via USB-port to an ESP-32. The ESP-32 will serially send data (about 10 times a second). For now, that data is sent as ASCII. That data needs to be received, some of it will be plotted vs time and also saved as a CSV file. The data to be received will be:
+I need software that connects via USB-port to an ESP-32. The ESP-32 will serially send data (about 10 times a second). 
+For now, that data is sent as ASCII. That data needs to be received, some of it will be plotted vs time and 
+also saved as a CSV file. The data to be received will be:
 Weight__g; Flow__mLPmin; FlowsensorError_Air; FlowsensorError_Overflow
 Weight and flow will be floating points, the FlowsensorError_Air and FlowsensorError_Overflow will be either "1" or "0" (boolean).
 
@@ -44,6 +46,10 @@ The program should have have a GUI (please us tkinter) with a classical Windows 
  File (Alt-F)
 File/Save As (Alt-F followed by A)
 File/Preferences (Alt-F followed by P)
+
+Tools (Alt-T)
+   Tools / Serial Monitor
+
 
 Help (Alt-H)
 Help/About (Alt-H followed by A)
