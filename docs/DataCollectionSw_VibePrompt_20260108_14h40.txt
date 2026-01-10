@@ -1,0 +1,71 @@
+I need to create software as described below. The description first goes over some general rules and then the specifics for this particular project.
+
+
+GENERAL
+
+Variable names need to be reasonably self-descriptive. Where appropriate the unit name (e.g., mL/min) should be included at the end of the variable name, separated from the rest of the variable name with a double underscore. Division in the unit ("per") should be indicated by a capital "P".  E.g., a flow rate might have a variable name like this:  flow__mlPsec.
+
+
+Functions should be separated by a line of “*” from each other. 
+Also, there should be a docstring at the beginning of each function that has a format like in this example:
+
+#*******************************************************************
+def myfunction(summand1: float|int, summand2: float|int)->float|int:
+"""
+--------------------------------------------------------------------
+myfunction()
+Returns the sum of the arguments
+
+INPUTS
+summand1… One of the summands. Can be any numerical value
+
+summand2…The other summand. Can be any numerical value.
+
+OUTPUTS
+returns: the sum of the summands
+
+
+(c) Kai Kuck 8-Jan-2026 20:45
+--------------------------------------------------------------------
+"""
+return(summand1+summand2)
+#*******************************************************************
+
+
+
+SPECIFIC SOFTWARE
+
+I need software that connects via USB-port to an ESP-32. The ESP-32 will serially send data (about 10 times a second). For now, that data is sent as ASCII. That data needs to be received, some of it will be plotted vs time and also saved as a CSV file. The data to be received will be:
+Weight__g; Flow__mLPmin; FlowsensorError_Air; FlowsensorError_Overflow
+Weight and flow will be floating points, the FlowsensorError_Air and FlowsensorError_Overflow will be either "1" or "0" (boolean).
+
+
+The program should have have a GUI (please us tkinter) with a classical Windows menu structure with (for now, this will be expanded in later versions) the following top menus and the dropdown items. The menus should be reachable visually, but also by keyboard shortcut as indicated in parentheses. 
+ File (Alt-F)
+File/Save As (Alt-F followed by A)
+File/Preferences (Alt-F followed by P)
+
+Help (Alt-H)
+Help/About (Alt-H followed by A)
+Please write the GUI using TK-Inter
+When choosing File/Preferences, a preferences window should open up. That window should have a way of closing it.
+For now, that window should allow the following settings:
+A drop-down menu for choosing the correct COM port (default should be COM3, if that is available). 
+A drop-down menu for choosing the baud rate. Options should be 115200, 230400, 460800, and 921600 bps. Default should be 230400.
+A scrollbar to be able to set the time-length over which the data is being plotted. The scrollbar should go from 60 to 420seconds. (default is 180sec)
+A file-open dialogbox that allows to choose the folder under which the data is being stored. The default folder should be C:\KaisDir\Dropbox\K0_Work\00_Elbeon\Elbeon_SkunkWorxx\UrineFlowmeter\Logging
+As soon as a setting is made, all settings should be stored in a settings file of the name "UroSettings" which should be stored in folder C:\KaisDir\Dropbox\K0_Work\00_Elbeon\Elbeon_SkunkWorxx\UrineFlowmeter\Settings
+If that folder does not exist, the settings should be stored in C:\
+
+When the program starts, it should look in C:\KaisDir\Dropbox\K0_Work\00_Elbeon\Elbeon_SkunkWorxx\UrineFlowmeter\Settings
+to see, whether there is a "UroSettings" file. If there is not (or if that folder does not exist), it should look in C:\ whether a "UroSettings" file exists. If it does, it should read it and set the settings to the values etc. that are stored in UroSettings. If it does not, it should set all settings to their default values (as specified above) and create a "UroSettings" file (in C:\KaisDir\Dropbox\K0_Work\00_Elbeon\Elbeon_SkunkWorxx\UrineFlowmeter\Settings
+if that folder exists or in C:\ if it does not). The UroSettings format should be JSON. 
+
+When the program starts, it should connect to the ESP32 and start receiving data. It should also show a main window that indicates on the status bar on the bottom whether the program is connected to the ESP32 or not, via which COM port and which baud-rate. The window should show a scrolling trend plot (the time-length of the plot is set in the preferences window). The window should have a button that says "Connect" if the ESP32 is not connected and say "Disconnect"  when it is connected. When the button is clicked, connection (or disconnection) should be executed and data reception commenced or ended, respectively.
+
+The program ends when the user closes that main window. When the program ends it should disconnect the connection. 
+Data should be stored every 30seconds and should also be stored when the program ends. After each storing execution the file should be closed and then later reopened and appended. The filename for the data should be "UroData_<DATETIME>.csv" where "<DATETIME>" is the systems date and time when the data is first stored after the program has started in format DDMMYYYY_HHMM. 
+
+
+
+
