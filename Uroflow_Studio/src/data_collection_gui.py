@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
+from tkinter.font import Font
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.animation import FuncAnimation
@@ -13,8 +14,8 @@ import time
 import sys
 from typing import Optional, List, Tuple, Callable
 
-from .settings_manager import load_settings, save_settings, get_default_settings
-from .serial_comm import SerialReader, get_available_ports
+from settings_manager import load_settings, save_settings, get_default_settings
+from serial_comm import SerialReader, get_available_ports
 
 #*******************************************************************
 class SerialMonitorWindow:
@@ -325,7 +326,22 @@ class DataCollectionGUI:
         self.settings__dict = load_settings()
         self.root = tk.Tk()
         self.root.title("Uroflowmetry Data Collection")
-        self.root.geometry("800x600")
+        
+        # Set minimum window size to ensure all elements are visible
+        self.root.minsize(800, 600)
+        
+        # Update the window to get accurate screen dimensions
+        self.root.update_idletasks()
+        
+        # Set initial window size
+        window_width = 2000
+        window_height = 1200
+        # Position window (centered + 200 pixels offset)
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        x_position = int((screen_width - window_width) / 2) + 800
+        y_position = int((screen_height - window_height) / 2) + 200
+        self.root.geometry(f"{window_width}x{window_height}+{x_position}+{y_position}")
         
         # Set default font size to 12 points for all GUI elements
         default_font = ('TkDefaultFont', 12)
@@ -339,6 +355,9 @@ class DataCollectionGUI:
         self.root.option_add('*TkSmallCaptionFont', default_font)
         self.root.option_add('*TkIconFont', default_font)
         self.root.option_add('*TkTooltipFont', default_font)
+        # Ensure menu items use 12pt font (don't set Label font globally as it may override explicit settings)
+        self.root.option_add('*Menu.Font', default_font)
+        self.root.option_add('*menubar.Font', default_font)
         
         # Data storage
         self.time_data__list: List[float] = []
@@ -362,9 +381,19 @@ class DataCollectionGUI:
         
         # Create GUI elements
         self._create_menu()
-        self._create_plot_area()
+        self._create_status_bar()  # Create status bar first so it's always visible
         self._create_control_panel()
-        self._create_status_bar()
+        self._create_plot_area()  # Create plot area last so it fills remaining space
+        
+        # Ensure window size is set correctly after all widgets are created
+        self.root.update_idletasks()
+        window_width = 2000
+        window_height = 1200
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        x_position = int((screen_width - window_width) / 2) + 800
+        y_position = int((screen_height - window_height) / 2) + 200
+        self.root.geometry(f"{window_width}x{window_height}+{x_position}+{y_position}")
         
         # Start with connection attempt
         self._connect_serial()
@@ -390,23 +419,23 @@ class DataCollectionGUI:
         (c) Kai Kuck 8-Jan-2026 20:45
         --------------------------------------------------------------------
         """
-        menubar = tk.Menu(self.root)
+        menubar = tk.Menu(self.root, font=('TkDefaultFont', 12))
         self.root.config(menu=menubar)
         
         # File menu
-        file_menu = tk.Menu(menubar, tearoff=0)
+        file_menu = tk.Menu(menubar, tearoff=0, font=('TkDefaultFont', 12))
         menubar.add_cascade(label="File", menu=file_menu, underline=0)
         file_menu.add_command(label="Save As...", command=self._save_as, accelerator="Alt+F, A")
         file_menu.add_separator()
         file_menu.add_command(label="Preferences...", command=self._show_preferences, accelerator="Alt+F, P")
         
         # Tools menu
-        tools_menu = tk.Menu(menubar, tearoff=0)
+        tools_menu = tk.Menu(menubar, tearoff=0, font=('TkDefaultFont', 12))
         menubar.add_cascade(label="Tools", menu=tools_menu, underline=0)
         tools_menu.add_command(label="Serial Monitor", command=self._show_serial_monitor, accelerator="Alt+T, S")
         
         # Help menu
-        help_menu = tk.Menu(menubar, tearoff=0)
+        help_menu = tk.Menu(menubar, tearoff=0, font=('TkDefaultFont', 12))
         menubar.add_cascade(label="Help", menu=help_menu, underline=0)
         help_menu.add_command(label="About", command=self._show_about, accelerator="Alt+H, A")
         
@@ -435,8 +464,14 @@ class DataCollectionGUI:
         # Set font size to 12 points
         plt.rcParams.update({'font.size': 12})
         
+        # Calculate figure size - account for menu, control panel, and status bar
+        # Use a reasonable default size that fits in the window
+        # The figure should be smaller than the window to leave room for other UI elements
+        fig_width = 18.0  # inches
+        fig_height = 10.0  # inches
+        
         # Create figure with two subplots
-        self.fig, (self.ax_weight, self.ax_flow) = plt.subplots(2, 1, figsize=(8, 6))
+        self.fig, (self.ax_weight, self.ax_flow) = plt.subplots(2, 1, figsize=(fig_width, fig_height))
         self.fig.tight_layout(pad=3.0)
         
         # Weight plot
@@ -465,6 +500,7 @@ class DataCollectionGUI:
         # Embed in tkinter
         self.canvas = FigureCanvasTkAgg(self.fig, self.root)
         self.canvas.draw()
+        # Pack canvas above the status bar, filling remaining space
         self.canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
         
         # Animation for real-time updates
@@ -485,9 +521,12 @@ class DataCollectionGUI:
         --------------------------------------------------------------------
         """
         control_frame = ttk.Frame(self.root)
-        control_frame.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
+        control_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=5, pady=5)
         
-        self.connect_button = ttk.Button(control_frame, text="Connect", command=self._toggle_connection)
+        # Use tk.Button instead of ttk.Button for better font control
+        # Set font to 12pt (20 pixels) like the status bar
+        button_font = Font(family='Segoe UI', size=20)
+        self.connect_button = tk.Button(control_frame, text="Connect", command=self._toggle_connection, font=button_font)
         self.connect_button.pack(side=tk.LEFT, padx=5)
 #*******************************************************************
 
@@ -504,7 +543,18 @@ class DataCollectionGUI:
         (c) Kai Kuck 8-Jan-2026 20:45
         --------------------------------------------------------------------
         """
-        self.status_bar = ttk.Label(self.root, text="Disconnected", relief=tk.SUNKEN, anchor=tk.W)
+        # Use regular tk.Label instead of ttk.Label for better font control
+        # Tkinter Font size is in pixels
+        # For 12pt at standard 96 DPI: 12pt = 16 pixels
+        # For higher DPI displays (125%, 150%), we need more pixels
+        # Use 20 pixels to ensure 12pt appearance on most displays
+        self.status_font = Font(family='Segoe UI', size=20)
+        
+        self.status_bar = tk.Label(self.root, text="Disconnected", relief=tk.SUNKEN, anchor=tk.W, 
+                                   font=self.status_font, bg='#f0f0f0', bd=1)
+        # Force font to be applied
+        self.status_bar['font'] = self.status_font
+        self.status_bar.configure(font=self.status_font)
         self.status_bar.pack(side=tk.BOTTOM, fill=tk.X)
         self._update_status_bar()
 #*******************************************************************
@@ -527,7 +577,9 @@ class DataCollectionGUI:
         else:
             status_text = f"Disconnected - {self.settings__dict['com_port']} @ {self.settings__dict['baud_rate']} bps"
         
+        # Ensure font is maintained at 12pt when updating - explicitly set font again
         self.status_bar.config(text=status_text)
+        self.status_bar.configure(font=self.status_font)
 #*******************************************************************
 
 #*******************************************************************
