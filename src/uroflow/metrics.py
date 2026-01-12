@@ -38,6 +38,8 @@ def compute_metrics(
     if len(ti) < 2: 
         return out
 
+    fs = 1.0 / float(np.median(np.diff(t_s)))
+
     start_t = float(t_s[start_idx])
     # stop_idx is exclusive, so use t_s[stop_idx] if valid, otherwise last sample
     if stop_idx < len(t_s):
@@ -49,12 +51,28 @@ def compute_metrics(
         return out
 
     # Volume: positive decrease in mass over interval
-    volume = float(-(mi[-1] - mi[0]))  # g ~ mL
+    # Sanity check: mass should decrease during void (mi[-1] < mi[0])
+    # If mass increased, this suggests wrong interval detection (e.g., detected seated step)
+    mass_change = mi[-1] - mi[0]
+    if mass_change > 0:
+        # Mass increased over interval - this is wrong for a void!
+        # Return None to flag invalid detection
+        return out
+    
+    volume = float(-mass_change)  # g ~ mL
+
+    # Windowed flow for Qmax (physiological definition)
+    qmax_window_s = 0.5  # 500 ms window
+    qmax_w = max(1, int(qmax_window_s * fs))
+
+    kernel = np.ones(qmax_w) / qmax_w
+    fi_smooth = np.convolve(fi, kernel, mode="same")
 
     # Qmax and timing
-    qmax = float(np.max(fi))
-    imax = int(np.argmax(fi))
+    qmax = float(np.max(fi_smooth))
+    imax = int(np.argmax(fi_smooth))
     t_to_qmax = float(ti[imax] - ti[0])
+
 
     # Qavg
     qavg = float(volume / duration)

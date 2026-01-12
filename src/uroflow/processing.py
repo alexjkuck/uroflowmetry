@@ -9,6 +9,12 @@ def moving_average(x, window_samples):
     return y
 
 def estimate_flow(t_s, mass_g_filt):
+    """
+    Estimate flow rate from filtered mass signal.
+    
+    Uses gradient for derivative. For high noise scenarios, mass_g_filt should
+    be heavily smoothed before calling this function.
+    """
     dm_dt = np.gradient(mass_g_filt, t_s)
     flow_ml_s = -dm_dt
     return flow_ml_s
@@ -115,10 +121,6 @@ def detect_void(
         if run >= n_start:
             start_idx = i - n_start + 1
             break
-
-
-
-
 
     if start_idx is None:
         return None, None, None, None
