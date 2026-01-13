@@ -20,7 +20,7 @@ consider adding 0.1 uF capacitor between +Vsupply and GND and as close to the se
 #define TRUE 1
 #define FALSE 0
 
-/*=========== HEADER FOR READING SENSIRION FLOW SENSOR ===========*/
+/*=========== Header for READING SENSIRION FLOW SENSOR ===========*/
 
 //  CONNECTIONS
 //   SDA > GPIO 21
@@ -36,7 +36,7 @@ consider adding 0.1 uF capacitor between +Vsupply and GND and as close to the se
 #define TEMP_SCALE_FACTOR 200.0   // Convert raw value to C
 
 
-/*=========== HEADER FOR READING SCALE ===========*/
+/*=========== Header for READING SCALE ===========*/
 #include "soc/rtc.h"
 #include "HX711.h"
 
@@ -49,6 +49,15 @@ const float INTERCEPT_g = -20107.22597; // (-21368.76167);
 float lp_raw=0.0;
 
 HX711 scale;
+
+/*=========== Header for SAMPLING CONTROL ===========*/
+
+// ---- sampling ----
+static const uint32_t SAMPLE_HZ = 10;
+static const uint32_t SAMPLE_PERIOD_US = 1000000UL / SAMPLE_HZ;  // 100000 us
+static uint32_t nextSampleUs = 0;
+
+
 
 /*=========== FUNCTIONS READING SENSIRION FLOW SENSOR ===========*/
 
@@ -159,8 +168,82 @@ startMeasurement();
 
 //------------- LOOP ----------------------------------
 
-void loop() {
+void loop() 
+{
+  uint32_t now;
+ 
+  bool new_scalevalue;
+  float mass_g;
+ 
+  long reading;
+  
 
+
+  // Initialize scheduler on first pass
+
+  now = micros();
+  if (nextSampleUs == 0) 
+    nextSampleUs = now + SAMPLE_PERIOD_US;
+
+  // Run exactly at 10 Hz
+  if ((int32_t)(now - nextSampleUs) >= 0) 
+  {
+    nextSampleUs += SAMPLE_PERIOD_US;  // prevents drift  
+    
+    // -------- Read SCALE (HX711 @ 10 Hz) --------
+    new_scalevalue = false;
+    mass_g = 999.9f;
+  
+// Wait a little for the HX711 to become ready (10Hz => new sample every 100ms)
+    // Give it up to 20ms so we usually catch the fresh sample even with small phase offset.
+    if (scale.wait_ready_timeout(20)) 
+    {
+      new_scalevalue = true;
+      reading = scale.read();
+
+      
+      mass_g = SLOPE_gPADC * (float)reading + INTERCEPT_g;
+      
+      
+    }
+
+// -------- Read FLOW (I2C) --------
+    int16_t rawFlow = 0, rawTemp = 0;
+    uint16_t flags = 0;
+    bool new_flowvalue = false;
+
+    float flowRate = 999.9f;   // ml/h
+    uint8_t airInLine = 9;
+    uint8_t highFlow  = 9;
+
+    if (readMeasurement(rawFlow, rawTemp, flags)) 
+    {
+      new_flowvalue = true;
+      flowRate = rawFlow / FLOW_SCALE_FACTOR;
+      airInLine = (flags & 0x0001) ? 1 : 0;
+      highFlow  = (flags & 0x0002) ? 1 : 0;
+    }
+
+// -------- Print ONE line per 10Hz tick --------
+    // Format: mass_g;flowRate;air;high
+    // (If a read failed, you’ll see 999.9 / 9s)
+
+  uint32_t t_us = micros();   // timestamp for this sample tick
+
+  Serial.print(t_us);
+  Serial.print(",");
+
+  Serial.print(new_scalevalue ? mass_g : 999.9f, 2);
+  Serial.print(",");
+  Serial.print(new_flowvalue ? flowRate : 999.9f, 2);
+  Serial.print(",");
+  Serial.print(airInLine);
+  Serial.print(",");
+  Serial.println(highFlow);
+}
+
+/*
+  ---------------------------------------
   //-- flow variables
   int16_t rawFlow, rawTemp;
   uint16_t flags;
@@ -247,6 +330,6 @@ void loop() {
     Serial.print(";");
     Serial.println(9);
   }
-
+*/
 }
 

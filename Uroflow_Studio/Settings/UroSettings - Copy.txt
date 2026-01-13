@@ -1,0 +1,6 @@
+{
+    "com_port": "COM3",
+    "baud_rate": 115200,
+    "plot_time_length__sec": 180,
+    "data_folder": "C:\\KaisDir\\Dropbox\\K0_Work\\00_Elbeon\\Elbeon_SkunkWorxx\\UrineFlowmeter\\0_Github\\uroflowmetry\\Uroflow_Studio\\DataLogs"
+}

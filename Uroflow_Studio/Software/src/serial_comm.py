@@ -154,6 +154,12 @@ class SerialReader:
                         line__str = line__str.strip()
                         
                         if line__str:
+                            # Debug: Print first few lines received
+                            if not hasattr(self, '_debug_line_count'):
+                                self._debug_line_count = 0
+                            if self._debug_line_count < 5:
+                                print(f"DEBUG: Received line: {line__str}")
+                                self._debug_line_count += 1
                             self._parse_line(line__str)
                 
                 # Check stop flag more frequently
@@ -180,7 +186,8 @@ class SerialReader:
         Parses a line of data from ESP-32
 
         INPUTS
-        line__str… Single line of ASCII data in format: Weight__g; Flow__mLPmin; FlowsensorError_Air; FlowsensorError_Overflow
+        line__str… Single line of ASCII data in format: t_us, mass_g, flowRate, airInLine, highFlow
+                   (comma-separated values where 999.9 indicates invalid data)
 
         OUTPUTS
         None
@@ -189,17 +196,44 @@ class SerialReader:
         --------------------------------------------------------------------
         """
         try:
-            parts = line__str.split(';')
-            if len(parts) >= 4:
-                Weight__g = float(parts[0].strip())
-                Flow__mLPmin = float(parts[1].strip())
-                FlowsensorError_Air = bool(int(parts[2].strip()))
-                FlowsensorError_Overflow = bool(int(parts[3].strip()))
+            parts = line__str.split(',')
+            if len(parts) >= 5:
+                t_us = float(parts[0].strip())  # Time in microseconds (not currently used)
+                mass_g = float(parts[1].strip())
+                flowRate = float(parts[2].strip())
+                airInLine = bool(int(parts[3].strip()))
+                highFlow = bool(int(parts[4].strip()))
+                
+                # Skip data points with invalid values (999.9)
+                INVALID_VALUE = 999.9
+                if mass_g >= INVALID_VALUE or flowRate >= INVALID_VALUE:
+                    if not hasattr(self, '_debug_skip_count'):
+                        self._debug_skip_count = 0
+                    if self._debug_skip_count < 3:
+                        print(f"DEBUG: Skipping invalid data - mass_g: {mass_g}, flowRate: {flowRate}")
+                        self._debug_skip_count += 1
+                    return
+                
+                # Map to callback format
+                Weight__g = mass_g
+                Flow__mLPmin = flowRate
+                FlowsensorError_Air = airInLine
+                FlowsensorError_Overflow = highFlow
                 
                 if self.data_callback__func:
                     self.data_callback__func(Weight__g, Flow__mLPmin, FlowsensorError_Air, FlowsensorError_Overflow)
-        except (ValueError, IndexError):
+            else:
+                if not hasattr(self, '_debug_parse_error_count'):
+                    self._debug_parse_error_count = 0
+                if self._debug_parse_error_count < 3:
+                    print(f"DEBUG: Line has insufficient parts ({len(parts)} < 5): {line__str}")
+                    self._debug_parse_error_count += 1
+        except (ValueError, IndexError) as e:
             # Skip malformed lines
-            pass
+            if not hasattr(self, '_debug_exception_count'):
+                self._debug_exception_count = 0
+            if self._debug_exception_count < 3:
+                print(f"DEBUG: Parse exception for line '{line__str}': {e}")
+                self._debug_exception_count += 1
 #*******************************************************************
 

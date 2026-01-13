@@ -608,9 +608,11 @@ class DataCollectionGUI:
         if self.serial_reader.connect():
             self.connect_button.config(text="Disconnect")
             self._update_status_bar()
+            print(f"DEBUG: Successfully connected to {self.settings__dict['com_port']} @ {self.settings__dict['baud_rate']} bps")
         else:
             self.connect_button.config(text="Connect")
             self._update_status_bar()
+            print(f"DEBUG: Failed to connect to {self.settings__dict['com_port']} @ {self.settings__dict['baud_rate']} bps")
             messagebox.showerror("Connection Error", 
                                 f"Failed to connect to {self.settings__dict['com_port']}")
 #*******************************************************************
@@ -685,6 +687,10 @@ class DataCollectionGUI:
         
         elapsed_time__sec = current_time__float - self.start_time__float
         
+        # Debug: Print first few data points
+        if len(self.time_data__list) < 5:
+            print(f"DEBUG: Received data - Time: {elapsed_time__sec:.3f}s, Weight: {Weight__g:.2f}g, Flow: {Flow__mLPmin:.2f}mL/min")
+        
         # Store data (this is thread-safe for appending)
         self.time_data__list.append(elapsed_time__sec)
         self.weight_data__list.append(Weight__g)
@@ -695,7 +701,7 @@ class DataCollectionGUI:
         # Write to CSV
         if self.csv_writer:
             self.csv_writer.writerow([
-                elapsed_time__sec,
+                round(elapsed_time__sec, 6),
                 Weight__g,
                 Flow__mLPmin,
                 1 if FlowsensorError_Air else 0,

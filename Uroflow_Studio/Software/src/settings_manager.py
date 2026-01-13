@@ -17,13 +17,14 @@ def get_settings_path()->Path:
     (c) Kai Kuck 8-Jan-2026 20:45
     --------------------------------------------------------------------
     """
-    settings_dir__primary = Path(r"C:\KaisDir\Dropbox\K0_Work\00_Elbeon\Elbeon_SkunkWorxx\UrineFlowmeter\Settings")
+    settings_dir__primary = Path(r"C:\KaisDir\Dropbox\K0_Work\00_Elbeon\Elbeon_SkunkWorxx\UrineFlowmeter\0_Github\uroflowmetry\Uroflow_Studio\Settings")
+
     settings_dir__fallback = Path("C:\\")
     
     if settings_dir__primary.exists():
-        return settings_dir__primary / "UroSettings"
+        return settings_dir__primary / "UroSettings.json"
     else:
-        return settings_dir__fallback / "UroSettings"
+        return settings_dir__fallback / "UroSettings.json"
 #*******************************************************************
 
 #*******************************************************************
@@ -55,9 +56,9 @@ def get_default_settings()->Dict[str, Any]:
     
     return {
         "com_port": default_com_port,
-        "baud_rate": 230400,
+        "baud_rate": 115200,
         "plot_time_length__sec": 180,
-        "data_folder": r"C:\KaisDir\Dropbox\K0_Work\00_Elbeon\Elbeon_SkunkWorxx\UrineFlowmeter\Logging"
+        "data_folder": r"C:\KaisDir\Dropbox\K0_Work\00_Elbeon\Elbeon_SkunkWorxx\UrineFlowmeter\0_Github\uroflowmetry\Uroflow_Studio\DataLogs"
     }
 #*******************************************************************
 
@@ -66,7 +67,7 @@ def load_settings()->Dict[str, Any]:
     """
     --------------------------------------------------------------------
     load_settings()
-    Loads settings from UroSettings file, or returns defaults if file doesn't exist
+    Loads settings from UroSettings.json file, or returns defaults if file doesn't exist
 
     OUTPUTS
     returns: Dictionary with settings values
@@ -101,7 +102,7 @@ def save_settings(settings__dict: Dict[str, Any])->None:
     """
     --------------------------------------------------------------------
     save_settings()
-    Saves settings dictionary to UroSettings file
+    Saves settings dictionary to UroSettings.json file
 
     INPUTS
     settings__dict… Dictionary containing settings to save
@@ -121,7 +122,7 @@ def save_settings(settings__dict: Dict[str, Any])->None:
             settings_dir__primary.mkdir(parents=True, exist_ok=True)
         except (OSError, PermissionError):
             # If we can't create primary, fall back to C:\
-            settings_path = Path("C:\\") / "UroSettings"
+            settings_path = Path("C:\\") / "UroSettings.json"
     
     try:
         with open(settings_path, 'w') as f:
@@ -129,7 +130,7 @@ def save_settings(settings__dict: Dict[str, Any])->None:
     except (IOError, PermissionError):
         # If we can't write to primary, try fallback
         if settings_path.parent != Path("C:\\"):
-            settings_path = Path("C:\\") / "UroSettings"
+            settings_path = Path("C:\\") / "UroSettings.json"
             with open(settings_path, 'w') as f:
                 json.dump(settings__dict, f, indent=4)
 #*******************************************************************
