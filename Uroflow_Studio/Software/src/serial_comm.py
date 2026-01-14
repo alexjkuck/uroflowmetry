@@ -204,9 +204,15 @@ class SerialReader:
                 airInLine = bool(int(parts[3].strip()))
                 highFlow = bool(int(parts[4].strip()))
                 
-                # Skip data points with invalid values (999.9)
+                # Skip data points with invalid values (999.9 is the sentinel value for "no valid data")
+                # Check if value is exactly 999.9 (within small tolerance) rather than >= 999.9
+                # This allows valid large weights (e.g., 1000g, 2000g, etc.) to pass through
                 INVALID_VALUE = 999.9
-                if mass_g >= INVALID_VALUE or flowRate >= INVALID_VALUE:
+                TOLERANCE = 0.01  # Small tolerance for floating point comparison
+                is_invalid_mass = abs(mass_g - INVALID_VALUE) < TOLERANCE
+                is_invalid_flow = abs(flowRate - INVALID_VALUE) < TOLERANCE
+                
+                if is_invalid_mass or is_invalid_flow:
                     if not hasattr(self, '_debug_skip_count'):
                         self._debug_skip_count = 0
                     if self._debug_skip_count < 3:

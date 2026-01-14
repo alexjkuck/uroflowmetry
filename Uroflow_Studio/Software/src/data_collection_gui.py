@@ -679,42 +679,56 @@ class DataCollectionGUI:
         (c) Kai Kuck 8-Jan-2026 20:45
         --------------------------------------------------------------------
         """
-        current_time__float = time.time()
-        
-        if self.start_time__float is None:
-            self.start_time__float = current_time__float
-            self._initialize_csv_file()
-        
-        elapsed_time__sec = current_time__float - self.start_time__float
-        
-        # Debug: Print first few data points
-        if len(self.time_data__list) < 5:
-            print(f"DEBUG: Received data - Time: {elapsed_time__sec:.3f}s, Weight: {Weight__g:.2f}g, Flow: {Flow__mLPmin:.2f}mL/min")
-        
-        # Store data (this is thread-safe for appending)
-        self.time_data__list.append(elapsed_time__sec)
-        self.weight_data__list.append(Weight__g)
-        self.flow_data__list.append(Flow__mLPmin)
-        self.error_air_data__list.append(FlowsensorError_Air)
-        self.error_overflow_data__list.append(FlowsensorError_Overflow)
-        
-        # Write to CSV
-        if self.csv_writer:
-            self.csv_writer.writerow([
-                round(elapsed_time__sec, 6),
-                Weight__g,
-                Flow__mLPmin,
-                1 if FlowsensorError_Air else 0,
-                1 if FlowsensorError_Overflow else 0
-            ])
-        
-        # Check if we need to save
-        if self.last_save_time__float is None:
-            self.last_save_time__float = current_time__float
-        elif current_time__float - self.last_save_time__float >= self.save_interval__sec:
-            self._save_csv_file()
-            self._reopen_csv_file()
-            self.last_save_time__float = current_time__float
+        try:
+            current_time__float = time.time()
+            
+            if self.start_time__float is None:
+                self.start_time__float = current_time__float
+                self._initialize_csv_file()
+            
+            elapsed_time__sec = current_time__float - self.start_time__float
+            
+            # Debug: Print first few data points
+            if len(self.time_data__list) < 5:
+                print(f"DEBUG: Received data - Time: {elapsed_time__sec:.3f}s, Weight: {Weight__g:.2f}g, Flow: {Flow__mLPmin:.2f}mL/min")
+            
+            # Store data (this is thread-safe for appending)
+            self.time_data__list.append(elapsed_time__sec)
+            self.weight_data__list.append(Weight__g)
+            self.flow_data__list.append(Flow__mLPmin)
+            self.error_air_data__list.append(FlowsensorError_Air)
+            self.error_overflow_data__list.append(FlowsensorError_Overflow)
+            
+            # Write to CSV - wrap in try-except to prevent errors from stopping data collection
+            if self.csv_writer:
+                try:
+                    self.csv_writer.writerow([
+                        round(elapsed_time__sec, 6),
+                        Weight__g,
+                        Flow__mLPmin,
+                        1 if FlowsensorError_Air else 0,
+                        1 if FlowsensorError_Overflow else 0
+                    ])
+                except Exception as e:
+                    # Log error but continue collecting data
+                    print(f"WARNING: Error writing to CSV: {e}")
+            
+            # Check if we need to save
+            if self.last_save_time__float is None:
+                self.last_save_time__float = current_time__float
+            elif current_time__float - self.last_save_time__float >= self.save_interval__sec:
+                try:
+                    self._save_csv_file()
+                    self._reopen_csv_file()
+                    self.last_save_time__float = current_time__float
+                except Exception as e:
+                    # Log error but continue collecting data
+                    print(f"WARNING: Error saving CSV file: {e}")
+        except Exception as e:
+            # Catch any other unexpected errors to prevent callback from stopping
+            print(f"ERROR: Exception in _on_data_received: {e}")
+            import traceback
+            traceback.print_exc()
 #*******************************************************************
 
 #*******************************************************************
@@ -817,118 +831,183 @@ class DataCollectionGUI:
         (c) Kai Kuck 8-Jan-2026 20:45
         --------------------------------------------------------------------
         """
-        plot_time_length__sec = self.settings__dict.get("plot_time_length__sec", 180)
-        current_time__float = time.time()
-        
-        if self.start_time__float is None:
-            # Initialize plot with full time window even if no data yet
-            self.ax_weight.set_xlim(0, plot_time_length__sec)
-            self.ax_flow.set_xlim(0, plot_time_length__sec)
-            self.canvas.draw_idle()
-            return
-        
-        elapsed_time__sec = current_time__float - self.start_time__float
-        
-        if not self.time_data__list:
-            # No data yet, show empty plot with initial time window
-            self.ax_weight.set_xlim(0, plot_time_length__sec)
-            self.ax_flow.set_xlim(0, plot_time_length__sec)
-            self.line_weight.set_data([], [])
-            self.line_flow.set_data([], [])
-            self.canvas.draw_idle()
-            return
-        
-        # Calculate time window - always start at 0, never negative
-        if elapsed_time__sec <= plot_time_length__sec:
-            # Show from 0 to current time (with small padding) when we have less data than window
-            time_window_start__sec = 0
-            time_window_end__sec = max(elapsed_time__sec + 1, plot_time_length__sec)  # Show full window or current time + padding
-        else:
-            # Show rolling window when we have more data than window size
-            time_window_start__sec = max(0, elapsed_time__sec - plot_time_length__sec)  # Ensure never negative
-            time_window_end__sec = elapsed_time__sec
-        
-        # Get all data - ensure arrays are synchronized (same length)
-        # Data might be appended from background thread, so get lengths first
-        time_len = len(self.time_data__list)
-        weight_len = len(self.weight_data__list)
-        flow_len = len(self.flow_data__list)
-        
-        # Use minimum length to ensure all arrays are synchronized
-        min_len = min(time_len, weight_len, flow_len)
-        
-        if min_len == 0:
-            # No data yet
-            self.line_weight.set_data([], [])
-            self.line_flow.set_data([], [])
-            self.canvas.draw_idle()
-            return
-        
-        # Create arrays with synchronized length
-        time_array = np.array(self.time_data__list[:min_len])
-        weight_array = np.array(self.weight_data__list[:min_len])
-        flow_array = np.array(self.flow_data__list[:min_len])
-        
-        # Filter data to show only within time window
-        mask = (time_array >= time_window_start__sec) & (time_array <= time_window_end__sec)
-        
-        if np.any(mask):
-            time_plot = time_array[mask]
-            weight_plot = weight_array[mask]
-            flow_plot = flow_array[mask]
-        else:
-            # Fallback: show all data if mask is empty
-            time_plot = time_array
-            weight_plot = weight_array
-            flow_plot = flow_array
-        
-        # Set x-axis limits FIRST to prevent autoscale from changing them
-        self.ax_weight.set_xlim(time_window_start__sec, time_window_end__sec)
-        self.ax_flow.set_xlim(time_window_start__sec, time_window_end__sec)
-        
-        # Update weight plot
-        if len(time_plot) > 0:
-            self.line_weight.set_data(time_plot, weight_plot)
-        else:
-            self.line_weight.set_data([], [])
-        
-        # Update flow plot
-        if len(time_plot) > 0:
-            self.line_flow.set_data(time_plot, flow_plot)
-        else:
-            self.line_flow.set_data([], [])
-        
-        # Update y-axis limits only (not x-axis)
-        # Only update y-axis if we have data
-        if len(time_plot) > 0:
-            # Manually set y-limits based on data range with some padding
-            if len(weight_plot) > 0:
-                weight_min = np.min(weight_plot)
-                weight_max = np.max(weight_plot)
-                weight_range = weight_max - weight_min
-                if weight_range > 0:
-                    self.ax_weight.set_ylim(weight_min - 0.1 * weight_range, weight_max + 0.1 * weight_range)
-                else:
-                    self.ax_weight.set_ylim(weight_min - 1, weight_max + 1)
-            
-            if len(flow_plot) > 0:
-                flow_min = np.min(flow_plot)
-                flow_max = np.max(flow_plot)
-                flow_range = flow_max - flow_min
-                if flow_range > 0:
-                    self.ax_flow.set_ylim(flow_min - 0.1 * flow_range, flow_max + 0.1 * flow_range)
-                else:
-                    self.ax_flow.set_ylim(flow_min - 1, flow_max + 1)
-        
-        # Ensure x-axis limits are set (never negative)
-        self.ax_weight.set_xlim(max(0, time_window_start__sec), time_window_end__sec)
-        self.ax_flow.set_xlim(max(0, time_window_start__sec), time_window_end__sec)
-        
-        # Use draw_idle for non-blocking updates
         try:
-            self.canvas.draw_idle()
-        except:
-            pass
+            plot_time_length__sec = self.settings__dict.get("plot_time_length__sec", 180)
+            current_time__float = time.time()
+            
+            if self.start_time__float is None:
+                # Initialize plot with full time window even if no data yet
+                self.ax_weight.set_xlim(0, plot_time_length__sec)
+                self.ax_flow.set_xlim(0, plot_time_length__sec)
+                self.canvas.draw_idle()
+                return
+            
+            elapsed_time__sec = current_time__float - self.start_time__float
+            
+            if not self.time_data__list:
+                # No data yet, show empty plot with initial time window
+                self.ax_weight.set_xlim(0, plot_time_length__sec)
+                self.ax_flow.set_xlim(0, plot_time_length__sec)
+                self.line_weight.set_data([], [])
+                self.line_flow.set_data([], [])
+                self.canvas.draw_idle()
+                return
+            
+            # Calculate time window - always start at 0, never negative
+            if elapsed_time__sec <= plot_time_length__sec:
+                # Show from 0 to current time (with small padding) when we have less data than window
+                time_window_start__sec = 0
+                time_window_end__sec = max(elapsed_time__sec + 1, plot_time_length__sec)  # Show full window or current time + padding
+            else:
+                # Show rolling window when we have more data than window size
+                time_window_start__sec = max(0, elapsed_time__sec - plot_time_length__sec)  # Ensure never negative
+                time_window_end__sec = elapsed_time__sec
+            
+            # Get all data - ensure arrays are synchronized (same length)
+            # Data might be appended from background thread, so get lengths first
+            time_len = len(self.time_data__list)
+            weight_len = len(self.weight_data__list)
+            flow_len = len(self.flow_data__list)
+            
+            # Use minimum length to ensure all arrays are synchronized
+            min_len = min(time_len, weight_len, flow_len)
+            
+            if min_len == 0:
+                # No data yet
+                self.line_weight.set_data([], [])
+                self.line_flow.set_data([], [])
+                self.canvas.draw_idle()
+                return
+            
+            # Create arrays with synchronized length
+            time_array = np.array(self.time_data__list[:min_len])
+            weight_array = np.array(self.weight_data__list[:min_len])
+            flow_array = np.array(self.flow_data__list[:min_len])
+            
+            # Filter data to show only within time window
+            mask = (time_array >= time_window_start__sec) & (time_array <= time_window_end__sec)
+            
+            if np.any(mask):
+                time_plot = time_array[mask]
+                weight_plot = weight_array[mask]
+                flow_plot = flow_array[mask]
+            else:
+                # Fallback: show all data if mask is empty
+                time_plot = time_array
+                weight_plot = weight_array
+                flow_plot = flow_array
+            
+            # Set x-axis limits FIRST to prevent autoscale from changing them
+            self.ax_weight.set_xlim(time_window_start__sec, time_window_end__sec)
+            self.ax_flow.set_xlim(time_window_start__sec, time_window_end__sec)
+            
+            # Update weight plot
+            if len(time_plot) > 0:
+                self.line_weight.set_data(time_plot, weight_plot)
+            else:
+                self.line_weight.set_data([], [])
+            
+            # Update flow plot
+            if len(time_plot) > 0:
+                self.line_flow.set_data(time_plot, flow_plot)
+            else:
+                self.line_flow.set_data([], [])
+            
+            # Update y-axis limits only (not x-axis)
+            # Only update y-axis if we have data
+            if len(time_plot) > 0:
+                # Manually set y-limits based on data range with some padding
+                # Wrap in try-except to handle very large values or invalid data
+                try:
+                    if len(weight_plot) > 0:
+                        # Filter out invalid values (NaN, inf) before calculating min/max
+                        valid_weight = weight_plot[np.isfinite(weight_plot)]
+                        if len(valid_weight) > 0:
+                            weight_min = np.min(valid_weight)
+                            weight_max = np.max(valid_weight)
+                            # Check for valid finite values
+                            if np.isfinite(weight_min) and np.isfinite(weight_max):
+                                weight_range = weight_max - weight_min
+                                if weight_range > 0:
+                                    # Use percentage padding, but ensure we don't create invalid limits
+                                    padding = 0.1 * weight_range
+                                    y_min = weight_min - padding
+                                    y_max = weight_max + padding
+                                    # Ensure limits are finite
+                                    if np.isfinite(y_min) and np.isfinite(y_max):
+                                        self.ax_weight.set_ylim(y_min, y_max)
+                                    else:
+                                        # Fallback: use data range with small fixed padding
+                                        self.ax_weight.set_ylim(weight_min - abs(weight_min) * 0.01, weight_max + abs(weight_max) * 0.01)
+                                else:
+                                    # Single value or very small range
+                                    if abs(weight_min) > 1e-10:
+                                        self.ax_weight.set_ylim(weight_min - abs(weight_min) * 0.1, weight_max + abs(weight_max) * 0.1)
+                                    else:
+                                        self.ax_weight.set_ylim(weight_min - 1, weight_max + 1)
+                except Exception as e:
+                    # If y-axis scaling fails, use autoscale as fallback
+                    try:
+                        self.ax_weight.relim()
+                        self.ax_weight.autoscale_view(axis='y', scalex=False)
+                    except:
+                        pass
+                
+                try:
+                    if len(flow_plot) > 0:
+                        # Filter out invalid values (NaN, inf) before calculating min/max
+                        valid_flow = flow_plot[np.isfinite(flow_plot)]
+                        if len(valid_flow) > 0:
+                            flow_min = np.min(valid_flow)
+                            flow_max = np.max(valid_flow)
+                            # Check for valid finite values
+                            if np.isfinite(flow_min) and np.isfinite(flow_max):
+                                flow_range = flow_max - flow_min
+                                if flow_range > 0:
+                                    # Use percentage padding, but ensure we don't create invalid limits
+                                    padding = 0.1 * flow_range
+                                    y_min = flow_min - padding
+                                    y_max = flow_max + padding
+                                    # Ensure limits are finite
+                                    if np.isfinite(y_min) and np.isfinite(y_max):
+                                        self.ax_flow.set_ylim(y_min, y_max)
+                                    else:
+                                        # Fallback: use data range with small fixed padding
+                                        self.ax_flow.set_ylim(flow_min - abs(flow_min) * 0.01, flow_max + abs(flow_max) * 0.01)
+                                else:
+                                    # Single value or very small range
+                                    if abs(flow_min) > 1e-10:
+                                        self.ax_flow.set_ylim(flow_min - abs(flow_min) * 0.1, flow_max + abs(flow_max) * 0.1)
+                                    else:
+                                        self.ax_flow.set_ylim(flow_min - 1, flow_max + 1)
+                except Exception as e:
+                    # If y-axis scaling fails, use autoscale as fallback
+                    try:
+                        self.ax_flow.relim()
+                        self.ax_flow.autoscale_view(axis='y', scalex=False)
+                    except:
+                        pass
+            
+            # Ensure x-axis limits are set (never negative)
+            self.ax_weight.set_xlim(max(0, time_window_start__sec), time_window_end__sec)
+            self.ax_flow.set_xlim(max(0, time_window_start__sec), time_window_end__sec)
+            
+            # Use draw_idle for non-blocking updates
+            try:
+                self.canvas.draw_idle()
+            except:
+                pass
+        except Exception as e:
+            # Catch any unexpected errors to prevent animation from stopping
+            # Log error but continue running
+            print(f"WARNING: Error in _update_plot: {e}")
+            import traceback
+            traceback.print_exc()
+            # Try to draw empty plot to keep animation alive
+            try:
+                self.canvas.draw_idle()
+            except:
+                pass
 #*******************************************************************
 
 #*******************************************************************
