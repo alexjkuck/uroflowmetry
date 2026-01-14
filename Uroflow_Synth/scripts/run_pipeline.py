@@ -3,6 +3,9 @@ from uroflow.io import load_raw_session, load_timebase
 from uroflow.processing import moving_average, estimate_flow, detect_seated, detect_void
 from uroflow.metrics import compute_metrics
 import sys
+import json
+from pathlib import Path
+from datetime import datetime, timezone
 
 session_dir = sys.argv[1] if len(sys.argv) > 1 else "sessions/sim_nominal"
 print("Running session:", session_dir)
@@ -71,14 +74,18 @@ flow_thr = max(1.0, max(median_flow * 0.3, p75 * 0.2))
 
 
 
+PERSIST_START_S = 0.3
+PERSIST_STOP_S = 0.4
+
 start_t, stop_t, i0, i1 = detect_void(
     t_s,
     flow,
     flow_thr,
-    t_start_s=0.3,  # Increased from 0.2s for more robustness
-    t_stop_s=0.4,   # Increased from 0.3s for more robustness
+    t_start_s=PERSIST_START_S,
+    t_stop_s=PERSIST_STOP_S,
     search_start_s=search_start_s,
 )
+
 
 # Sanity check: ensure void doesn't start before seated (shouldn't happen, but check anyway)
 if i0 is not None and seated_t is not None:
@@ -142,8 +149,9 @@ if i0 is None and total_mass_drop_ml >= LIKELY_VOID_ML:
 
 
 
-# Metrics
+# Metrics (compute BEFORE writing payload)
 metrics = compute_metrics(t_s, mass_g_filt, flow, i0, i1)
+
 print("Metrics:")
 
 def _fmt(v, nd=2):
@@ -156,3 +164,55 @@ print(f"  void_duration_s   = {_fmt(metrics['void_duration_s'], 2)} s")
 print(f"  time_to_qmax_s    = {_fmt(metrics['time_to_qmax_s'], 2)} s")
 print(f"  start_t_s         = {_fmt(metrics['start_t_s'], 2)} s")
 print(f"  stop_t_s          = {_fmt(metrics['stop_t_s'], 2)} s")
+
+
+# --- Write metrics.json artifact ---
+def write_metrics_json(session_dir, payload, filename="metrics.json"):
+    out = Path(session_dir) / filename
+    payload = dict(payload)
+    payload["generated_utc"] = datetime.now(timezone.utc).isoformat()
+    out.write_text(json.dumps(payload, indent=2))
+    return out
+
+# Record the actual filter windows you used
+mass_filter_windows_s = [float(w1) / float(fs), float(w2) / float(fs)]
+flow_filter_window_s = float(flow_smooth_w) / float(fs)
+
+# These are the persistence params you actually used in detect_void()
+PERSIST_START_S = 0.3
+PERSIST_STOP_S = 0.4
+
+payload = {
+    "schema_version": "uroflow.v0.1",
+    "session_dir": str(session_dir),
+    "input": {"raw_csv": "raw.csv"},
+    "timebase": {
+        "fs_hz": float(fs),
+        "n_samples": int(len(t_s)),
+        "t_start_s": float(t_s[0]),
+        "t_end_s": float(t_s[-1]),
+    },
+    "params": {
+        "mass_filter_windows_s": mass_filter_windows_s,
+        "flow_filter_window_s": flow_filter_window_s,
+        "search_start_s": float(search_start_s),
+        "flow_thr_ml_s": float(flow_thr),
+        "persist_start_s": float(PERSIST_START_S),
+        "persist_stop_s": float(PERSIST_STOP_S),
+        "min_void_s": float(MIN_VOID_S),
+        "min_void_ml": float(MIN_VOID_ML),
+        "qmax_smooth_window_s": 0.5,
+    },
+    "detection": {
+        "status": "detected" if i0 is not None else "none",
+        "start_idx": i0,
+        "stop_idx": i1,
+        "start_t_s": (None if start_t is None else float(start_t)),
+        "stop_t_s": (None if stop_t is None else float(stop_t)),
+        "seated_t_s": (None if seated_t is None else float(seated_t)),
+    },
+    "metrics": metrics,
+}
+
+outpath = write_metrics_json(session_dir, payload)
+print(f"Wrote {outpath}")
