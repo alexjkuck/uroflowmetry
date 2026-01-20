@@ -1,0 +1,25 @@
+
+19-Jan-2026
+
+NEXT STEPS:
+
+DATA COLLECTION:
+- collect more data with the bottle in a backpack
+- collect data while going through specified motions (e.g., arm resting on upper legs)
+
+DATA PROCESSING:
+- characterize noise from collected data without any flow
+    - e.g., random noise (white noise w/ SD)
+    - e.g., periodic noise (frequency, amplitude, phase)
+    - e.g., sudden jumps (ampitude, positive/negative direction, timepoint of jump)
+
+DATA SYNTHESIS:
+- digitize typical waveforms from the links/youtube video sent to Alex
+- create a function to fabricate noise (based on characterization of noise)
+- create a family of synthesized waveforms (typical waveforms + noise)
+
+
+MISCELLANEOUS:
+- Kai to reach out to paper authors requesting access to the data
+
+
