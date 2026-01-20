@@ -1,0 +1,13 @@
+# Requirements for uroflowmetry project
+# 
+# This file lists all Python dependencies needed across all components:
+# - Uroflow_Synth: Signal processing and analysis
+# - Uroflow_Studio: GUI application for data collection
+# - Scripts: Utility scripts
+
+numpy
+pandas
+scipy
+matplotlib
+pyserial
+
