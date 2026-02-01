@@ -1,0 +1,34 @@
+NO MOVEMENT             from    to
+  Metronome Breathing  	0:15	0:45
+  No Breathing	    	1:00	1:30
+  Normal Breathing	1:45	2:15
+					
+MOVEMENT					
+  Metronome Breathing	2:30	3:00
+  No Breathing		3:15	3:45
+  Normal Breathing	4:00	4:30
+
+
+
+=====================================
+
+ZeroFlow_01022026_1338.csv
+
+HighFlowA_01022026_1413.csv
+   this was done with a 1 gallon plastic bottle
+   towards the end it was noted that
+      - the bottle was crunched, apparently b/c there was no air getting in
+          (when the bottle was opened air rushed in)
+      - flow was trickling rather than flowing
+
+--> have added a small air hole in the bottle cap and will repeat this high flow condition
+    hopefully avoiding the trickle-flow towards the end
+
+
+HighFlowB_01022026_1427.csv
+  this was collected in the same conditions as HighFlowA_01022026_1413.csv, except that now 
+  there is a little air hole in the bottle cap
+
+
+MediumFlow_01022026_1435.csv
+  Medium flow and still the airhole in the bottle
